@@ -128,6 +128,8 @@ function MessageActions({ message, contactName, isAnonymous, onActionComplete }:
         <TaskForm
           contactId={message.contact_id}
           contactName={contactName}
+          initialTitle={contactName ?? undefined}
+          initialDescription={message.content}
           onTaskCreated={onActionComplete}
           onClose={() => setExpanded(false)}
         />

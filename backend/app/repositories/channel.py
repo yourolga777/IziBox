@@ -17,6 +17,12 @@ class ChannelRepository(BaseRepository[ChannelModel]):
         )
         return list(result.scalars().all())
 
+    async def get_disconnected(self) -> List[ChannelModel]:
+        result = await self.session.execute(
+            self._scoped(select(self.model).where(self.model.is_connected.is_(False)))
+        )
+        return list(result.scalars().all())
+
     async def get_by_type(self, channel_type: str) -> List[ChannelModel]:
         result = await self.session.execute(
             self._scoped(select(self.model).where(self.model.type == channel_type))

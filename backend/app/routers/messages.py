@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any, List, Literal, Optional
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -450,9 +450,10 @@ async def get_message(
 async def download_attachment(
     message_id: int,
     attachment_id: int,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     current_user: UserModel = Depends(get_current_user),
-) -> StreamingResponse:
+) -> Response:
     message_repo = MessageRepository(session, owner_id=int(current_user.id))
     message = await message_repo.get_by_id(message_id)
     if not message:
@@ -496,18 +497,72 @@ async def download_attachment(
         media_type.startswith("image/")
         or media_type.startswith("audio/")
         or media_type.startswith("video/")
+        or media_type == "application/pdf"
     )
     disposition = (
         f'{"inline" if inline else "attachment"}; filename="{ascii_name}"; '
         f"filename*=UTF-8''{encoded_name}"
     )
+
+    data.seek(0, io.SEEK_END)
+    total_size = data.tell()
     data.seek(0)
+
+    if total_size <= 0:
+        return StreamingResponse(
+            iter([b""]),
+            media_type=media_type,
+            headers={"Content-Disposition": disposition},
+        )
+
+    start = 0
+    end = total_size - 1
+    status_code = 200
+    headers: dict[str, str] = {
+        "Content-Disposition": disposition,
+        "Accept-Ranges": "bytes",
+        "Content-Length": str(total_size),
+    }
+
+    range_header = request.headers.get("range")
+    if range_header:
+        match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header.strip())
+        valid = match is not None
+        if match:
+            s_raw, e_raw = match.groups()
+            if s_raw == "" and e_raw == "":
+                valid = False
+            elif s_raw == "":
+                suffix = int(e_raw)
+                if suffix <= 0:
+                    valid = False
+                else:
+                    start = max(0, total_size - suffix)
+                    end = total_size - 1
+            else:
+                start = int(s_raw)
+                end = int(e_raw) if e_raw != "" else total_size - 1
+                if start > end or start >= total_size:
+                    valid = False
+                else:
+                    end = min(end, total_size - 1)
+        if not valid:
+            return Response(
+                status_code=416,
+                headers={"Content-Range": f"bytes */{total_size}"},
+            )
+        status_code = 206
+        headers["Content-Range"] = f"bytes {start}-{end}/{total_size}"
+        headers["Content-Length"] = str(end - start + 1)
+
+    data.seek(start)
+    chunk = data.read(end - start + 1)
+
     return StreamingResponse(
-        iter([data.read()]),
+        iter([chunk]),
+        status_code=status_code,
         media_type=media_type,
-        headers={
-            "Content-Disposition": disposition,
-        },
+        headers=headers,
     )
 
 

@@ -8,11 +8,13 @@ interface TaskFormProps {
   contactName: string | null
   onTaskCreated: () => void
   onClose: () => void
+  initialTitle?: string
+  initialDescription?: string
 }
 
-function TaskForm({ contactId, contactName, onTaskCreated, onClose }: TaskFormProps) {
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
+function TaskForm({ contactId, contactName, onTaskCreated, onClose, initialTitle, initialDescription }: TaskFormProps) {
+  const [title, setTitle] = useState(initialTitle ?? '')
+  const [description, setDescription] = useState(initialDescription ?? '')
   const [dueDate, setDueDate] = useState('')
   const [reminder, setReminder] = useState<number | ''>('')
   const [recurrence, setRecurrence] = useState<string>('')

@@ -193,7 +193,7 @@ class ChannelService:
                         adapter = EmailAdapter()
                         email_cfg = dict(cfg)
                         if "password" in email_cfg:
-                            email_cfg["password"] = decrypt(email_cfg["password"])
+                            email_cfg["password"] = self._maybe_decrypt(email_cfg["password"])
                         connected_ok = await asyncio.wait_for(
                             adapter.connect(email_cfg), timeout=15
                         )
@@ -293,6 +293,36 @@ class ChannelService:
             results.append(entry)
 
         return {"channels": results, "total_new": total_new}
+
+    async def _poll_interval(self, channel_type: str) -> int:
+        settings_repo = SettingsRepository(self.session)
+        if channel_type == "telegram":
+            key, default = "telegram_poll_interval", settings.TELEGRAM_POLL_INTERVAL
+        else:
+            key, default = "email_poll_interval", settings.EMAIL_POLL_INTERVAL
+        value = await settings_repo.get(key)
+        if value is None:
+            value = default
+        return int(value)
+
+    async def reconnect_disconnected(self, poll_service: PollService) -> int:
+        """Переподключает каналы с is_connected=False (например, отвалившиеся при
+        старте без сети), чтобы они поднялись без ручного «Переподключить»."""
+        disconnected = await self.repo.get_disconnected()
+        reconnected = 0
+        for channel in disconnected:
+            if poll_service.is_running(channel.type):
+                continue
+            adapter = await self._connect_saved(channel)
+            if adapter is None:
+                continue
+            poll_service.register_channel(channel.type, adapter)
+            interval = await self._poll_interval(channel.type)
+            poll_service.start(channel.type, interval, since=channel.last_polled_at)
+            await self.repo.update(channel.id, is_connected=True)
+            logger.info("Reconnected %s channel after disconnect", channel.type)
+            reconnected += 1
+        return reconnected
 
     async def _connect_saved(
         self,

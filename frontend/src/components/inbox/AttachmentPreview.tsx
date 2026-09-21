@@ -18,6 +18,7 @@ export default function AttachmentPreview({ messageId, attachment, isOpen, onClo
   const isImage = !imageError && attachment.mime_type?.startsWith('image/')
   const isAudio = attachment.mime_type?.startsWith('audio/')
   const isVideo = attachment.mime_type?.startsWith('video/')
+  const isPdf = attachment.mime_type === 'application/pdf'
   const fileName = attachment.file_name || `attachment_${attachment.id}`
 
   return (
@@ -74,6 +75,12 @@ export default function AttachmentPreview({ messageId, attachment, isOpen, onClo
                   )}
                 </div>
               </div>
+            ) : isPdf ? (
+              <iframe
+                src={downloadUrl}
+                title={fileName}
+                className="w-full h-[60vh] rounded-lg shadow-sm border border-gray-200 bg-white"
+              />
             ) : (
               <div className="text-center space-y-3">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white border border-gray-200 shadow-sm">

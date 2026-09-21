@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useCallback, useMemo, useEffect } from 'react'
+import { memo, useState, useRef, useCallback, useMemo, useEffect, Fragment } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { InboxIcon, RefreshCw, MessageSquare, Clock, Mail, ArrowUpDown, CheckSquare, Star, UserPlus, ShieldAlert, Search, Plus, Pencil, Tag, Check, X } from 'lucide-react'
@@ -174,6 +174,10 @@ function Inbox() {
       (f) => !f.parent_id && (f.contact_type || 'other') === tab,
     )
   }, [folders, tab])
+
+  const userFolders = useMemo(() => {
+    return folders.filter((f) => !f.category_key)
+  }, [folders])
 
   const channelFolderIds = useMemo(() => {
     const byId = new Map(folders.map(f => [f.id, f]))
@@ -437,11 +441,16 @@ function Inbox() {
     }
   }
 
-  const handleBulkClassify = async (contactType: ContactTypeValue) => {
+  const handleBulkClassify = async (contactType: ContactTypeValue, folderId?: number) => {
     if (selectedChatIds.size === 0 || bulkBusy) return
     setBulkBusy(true)
     try {
-      await contactApi.bulkUpdate({ ids: Array.from(selectedChatIds), contact_type: contactType })
+      const payload: { ids: number[]; contact_type: ContactTypeValue; folder_id?: number } = {
+        ids: Array.from(selectedChatIds),
+        contact_type: contactType,
+      }
+      if (folderId !== undefined) payload.folder_id = folderId
+      await contactApi.bulkUpdate(payload)
       showToast('Классифицировано', 'success')
       setSelectedChatIds(new Set())
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
@@ -496,15 +505,40 @@ function Inbox() {
               value=""
               disabled={bulkBusy}
               onChange={(e) => {
-                const v = e.target.value as ContactTypeValue
-                if (v) handleBulkClassify(v)
+                const v = e.target.value
+                if (!v) return
+                if (v.startsWith('folder:')) {
+                  const fid = Number(v.slice('folder:'.length))
+                  const folder = userFolders.find(f => f.id === fid)
+                  if (folder) handleBulkClassify((folder.contact_type || 'other') as ContactTypeValue, fid)
+                } else {
+                  handleBulkClassify(v as ContactTypeValue)
+                }
               }}
               className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg bg-white outline-none focus:border-primary"
             >
               <option value="" disabled>Классифицировать…</option>
-              {CONTACT_TYPES.map(t => (
-                <option key={t} value={t}>{CONTACT_TYPE_META[t].label}</option>
-              ))}
+              {CONTACT_TYPES.map(t => {
+                const typeFolders = userFolders.filter(f => (f.contact_type || 'other') === t)
+                const topLevel = typeFolders.filter(f => !f.parent_id)
+                const subfoldersOf = (pid: number) => typeFolders.filter(f => f.parent_id === pid)
+                if (topLevel.length === 0) {
+                  return <option key={t} value={t}>{CONTACT_TYPE_META[t].label}</option>
+                }
+                return (
+                  <optgroup key={t} label={CONTACT_TYPE_META[t].label}>
+                    <option value={t}>{CONTACT_TYPE_META[t].label} (без папки)</option>
+                    {topLevel.map(f => (
+                      <Fragment key={f.id}>
+                        <option value={`folder:${f.id}`}>{f.name}</option>
+                        {subfoldersOf(f.id).map(sf => (
+                          <option key={sf.id} value={`folder:${sf.id}`}>&nbsp;&nbsp;&nbsp;&nbsp;↳ {sf.name}</option>
+                        ))}
+                      </Fragment>
+                    ))}
+                  </optgroup>
+                )
+              })}
             </select>
             <button
               onClick={() => setSelectedChatIds(new Set())}

@@ -110,8 +110,86 @@ async def test_download_attachment_endpoint():
 
         assert resp.status_code == 200
         assert resp.content == b"%PDF-1.4 fake"
-        assert "attachment" in resp.headers["content-disposition"]
+        assert "inline" in resp.headers["content-disposition"]
         assert "report.pdf" in resp.headers["content-disposition"]
+        assert resp.headers["accept-ranges"] == "bytes"
+
+
+@pytest.mark.asyncio
+async def test_download_attachment_range_partial():
+    async with make_client() as client:
+        c = await client.post("/api/contacts/", json={"name": "Range Test"})
+        cid = c.json()["id"]
+        m = await client.post("/api/messages/", json={
+            "contact_id": cid,
+            "channel": "telegram",
+            "content": "video",
+            "direction": "incoming",
+            "attachments": [{
+                "channel_message_id": "msg_vid",
+                "file_name": "clip.mp4",
+                "file_size": 10,
+                "mime_type": "video/mp4",
+                "file_path": "tg-file-vid",
+            }],
+        })
+        assert m.status_code == 201
+        msg = m.json()
+        att = msg["attachments"][0]
+
+        payload = b"0123456789"
+        adapter = AsyncMock()
+        adapter.download_file = AsyncMock(return_value=io.BytesIO(payload))
+        ps = MagicMock()
+        ps.get_channel.return_value = adapter
+
+        with patch("app.routers.messages.get_poll_service", return_value=ps):
+            resp = await client.get(
+                f"/api/messages/{msg['id']}/attachments/{att['id']}/download",
+                headers={"range": "bytes=2-5"},
+            )
+
+        assert resp.status_code == 206
+        assert resp.content == b"2345"
+        assert resp.headers["content-range"] == "bytes 2-5/10"
+        assert resp.headers["content-length"] == "4"
+
+
+@pytest.mark.asyncio
+async def test_download_attachment_range_invalid():
+    async with make_client() as client:
+        c = await client.post("/api/contacts/", json={"name": "Range Invalid"})
+        cid = c.json()["id"]
+        m = await client.post("/api/messages/", json={
+            "contact_id": cid,
+            "channel": "telegram",
+            "content": "video",
+            "direction": "incoming",
+            "attachments": [{
+                "channel_message_id": "msg_vid2",
+                "file_name": "clip2.mp4",
+                "file_size": 10,
+                "mime_type": "video/mp4",
+                "file_path": "tg-file-vid2",
+            }],
+        })
+        msg = m.json()
+        att = msg["attachments"][0]
+
+        payload = b"0123456789"
+        adapter = AsyncMock()
+        adapter.download_file = AsyncMock(return_value=io.BytesIO(payload))
+        ps = MagicMock()
+        ps.get_channel.return_value = adapter
+
+        with patch("app.routers.messages.get_poll_service", return_value=ps):
+            resp = await client.get(
+                f"/api/messages/{msg['id']}/attachments/{att['id']}/download",
+                headers={"range": "bytes=9999-10000"},
+            )
+
+        assert resp.status_code == 416
+        assert resp.headers["content-range"] == "bytes */10"
 
 
 @pytest.mark.asyncio

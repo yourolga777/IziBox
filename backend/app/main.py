@@ -52,6 +52,7 @@ logger = logging.getLogger(__name__)
 
 poll_service: PollService | None = None
 _outbox_task: asyncio.Task[Any] | None = None
+_channel_reconnect_task: asyncio.Task[Any] | None = None
 _reminder_scheduler: ReminderScheduler | None = None
 
 
@@ -77,10 +78,29 @@ async def _outbox_worker_loop() -> None:
         await asyncio.sleep(settings.OUTBOX_POLL_INTERVAL)
 
 
+async def _channel_reconnect_loop() -> None:
+    """Периодически переподключает каналы, отвалившиеся при старте без сети."""
+    while True:
+        try:
+            ps = get_poll_service()
+            if ps is not None:
+                session_maker = get_async_session_maker()
+                async with session_maker() as session:
+                    service = ChannelService(session)
+                    await service.reconnect_disconnected(ps)
+                    await session.commit()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error("Channel reconnect worker error: %s", e)
+        await asyncio.sleep(settings.CHANNEL_RECONNECT_INTERVAL)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global poll_service
     global _outbox_task
+    global _channel_reconnect_task
     global _reminder_scheduler
     setup_logging()
     logger.info("Starting IziBox...")
@@ -117,6 +137,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             channel_service = ChannelService(session)
             await channel_service.restore_channels(poll_service)
         _outbox_task = asyncio.create_task(_outbox_worker_loop())
+        _channel_reconnect_task = asyncio.create_task(_channel_reconnect_loop())
         _reminder_scheduler = ReminderScheduler(session_maker, interval=60)
         _reminder_scheduler.start()
     else:
@@ -136,6 +157,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except asyncio.CancelledError:
             pass
         _outbox_task = None
+    if _channel_reconnect_task:
+        _channel_reconnect_task.cancel()
+        try:
+            await _channel_reconnect_task
+        except asyncio.CancelledError:
+            pass
+        _channel_reconnect_task = None
     if poll_service:
         await poll_service.stop_all()
         for ct, adapter in list(poll_service.channels.items()):

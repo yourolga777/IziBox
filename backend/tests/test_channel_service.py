@@ -241,3 +241,56 @@ async def test_restore_channels_decrypt_failure_sets_disconnected(service):
 
         poll_service.register_channel.assert_not_called()
         service.repo.update.assert_awaited_once_with(channel.id, is_connected=False)
+
+
+@pytest.mark.asyncio
+async def test_reconnect_disconnected_telegram(service):
+    channel = MagicMock(
+        type="telegram",
+        config={"session_string": "abc"},
+        last_polled_at=None,
+    )
+    service.repo.get_disconnected = AsyncMock(return_value=[channel])
+    service.repo.update = AsyncMock()
+    poll_service = MagicMock()
+    poll_service.is_running.return_value = False
+    repo_mock = _mock_settings_repo(tg=10)
+    adapter_instance = AsyncMock()
+    service._connect_saved = AsyncMock(return_value=adapter_instance)
+
+    with patch("app.services.channel_service.SettingsRepository", return_value=repo_mock):
+        result = await service.reconnect_disconnected(poll_service)
+
+    assert result == 1
+    poll_service.register_channel.assert_called_once_with("telegram", adapter_instance)
+    poll_service.start.assert_called_once_with("telegram", 10, since=channel.last_polled_at)
+    service.repo.update.assert_awaited_once_with(channel.id, is_connected=True)
+
+
+@pytest.mark.asyncio
+async def test_reconnect_disconnected_skips_running(service):
+    channel = MagicMock(type="telegram", config={})
+    service.repo.get_disconnected = AsyncMock(return_value=[channel])
+    poll_service = MagicMock()
+    poll_service.is_running.return_value = True
+    service._connect_saved = AsyncMock()
+
+    result = await service.reconnect_disconnected(poll_service)
+
+    assert result == 0
+    service._connect_saved.assert_not_called()
+    poll_service.register_channel.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_disconnected_connect_fails(service):
+    channel = MagicMock(type="telegram", config={})
+    service.repo.get_disconnected = AsyncMock(return_value=[channel])
+    poll_service = MagicMock()
+    poll_service.is_running.return_value = False
+    service._connect_saved = AsyncMock(return_value=None)
+
+    result = await service.reconnect_disconnected(poll_service)
+
+    assert result == 0
+    poll_service.register_channel.assert_not_called()

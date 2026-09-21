@@ -236,17 +236,19 @@ async def onboarding_complete(data: OnboardingComplete) -> dict[str, Any]:
             em = data.email
             if em.email:
                 channel_service = ChannelService(session, owner_id=DEFAULT_OWNER_ID)
+                email_config: dict[str, Any] = {
+                    "email": em.email,
+                    "imap_host": em.imap_host,
+                    "imap_port": em.imap_port,
+                    "smtp_host": em.smtp_host,
+                    "smtp_port": em.smtp_port,
+                }
+                if em.password:
+                    email_config["password"] = encrypt(em.password)
                 await channel_service.create(
                     channel_type="email",
                     name=em.email,
-                    config={
-                        "email": em.email,
-                        "password": em.password,
-                        "imap_host": em.imap_host,
-                        "imap_port": em.imap_port,
-                        "smtp_host": em.smtp_host,
-                        "smtp_port": em.smtp_port,
-                    }
+                    config=email_config,
                 )
 
         if data.proxy:

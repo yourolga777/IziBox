@@ -86,4 +86,15 @@ describe('MessageActions', () => {
     renderActions(makeMessage({ extracted_code: null }));
     expect(screen.queryByText(/Код:/)).not.toBeInTheDocument();
   });
+
+  it('предзаполняет заголовок и описание из сообщения (AC1/AC2)', () => {
+    renderActions(makeMessage({ content: 'Текст сообщения' }));
+    fireEvent.click(screen.getByText('+ Задача'));
+
+    const title = screen.getByPlaceholderText('Заголовок задачи') as HTMLInputElement;
+    const desc = screen.getByPlaceholderText('Описание задачи (необязательно)...') as HTMLTextAreaElement;
+
+    expect(title.value).toBe('Иван');
+    expect(desc.value).toBe('Текст сообщения');
+  });
 });

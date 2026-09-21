@@ -51,6 +51,7 @@ function EmailConnect({ onConnected, initialEmail }: EmailConnectProps) {
         setForm(prev => ({
           ...prev,
           email: config.email?.email || prev.email,
+          password: config.email?.password || prev.password,
           imap_host: config.email?.imap_host || prev.imap_host,
           imap_port: config.email?.imap_port || prev.imap_port,
           smtp_host: config.email?.smtp_host || prev.smtp_host,

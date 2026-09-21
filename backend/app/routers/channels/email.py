@@ -192,7 +192,10 @@ async def reconnect_email_stored(
         from ...channels.email import EmailAdapter
         from ...utils.crypto import decrypt
 
-        password = decrypt(encrypted_password)
+        try:
+            password = decrypt(encrypted_password)
+        except InvalidToken:
+            password = encrypted_password
 
         ps = get_poll_service()
         if ps:

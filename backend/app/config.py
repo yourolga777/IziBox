@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     OUTBOX_MAX_ATTEMPTS: int = 5
     OUTBOX_BASE_DELAY: int = 5
     OUTBOX_SEND_TIMEOUT: float = 20.0
+    CHANNEL_RECONNECT_INTERVAL: int = 60
 
     RATE_LIMIT_ENABLED: bool = False
     RATE_LIMIT_DEFAULT: str = "60/minute"

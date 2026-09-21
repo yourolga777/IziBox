@@ -66,7 +66,7 @@ describe('ThreadList', () => {
     const button = screen.getByRole('button', { name: /report\.pdf/i });
     button.click();
 
-    expect(await screen.findByText('Предпросмотр недоступен')).toBeInTheDocument();
+    expect(await screen.findByTitle('report.pdf')).toBeInTheDocument();
     expect(screen.getByText('Сохранить')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Открыть' })).toHaveAttribute(
       'href',

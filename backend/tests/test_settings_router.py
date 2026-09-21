@@ -1,5 +1,5 @@
 import json
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -110,3 +110,56 @@ async def test_onboarding_config_corrupt_file_logs_and_returns_empty(tmp_path, m
             response = await client.get("/api/settings/onboarding-config")
     assert response.status_code == 200
     assert any("ONBOARDING_FILE" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_onboarding_complete_encrypts_email_password(tmp_path, monkeypatch):
+    from app.routers import settings as settings_router
+    from app.utils.crypto import decrypt
+
+    enc_file = tmp_path / "onboarding.enc"
+    monkeypatch.setattr(settings_router, "get_user_onboarding_file", lambda _login: enc_file)
+    monkeypatch.setattr(settings_router, "ensure_user_data_dir", lambda _login: None)
+    monkeypatch.setattr(settings_router, "set_active_login", lambda _login: None)
+    monkeypatch.setattr(settings_router, "set_poll_service", lambda _ps: None)
+    monkeypatch.setattr("app.deps.get_poll_service", lambda: None)
+    monkeypatch.setattr(settings_router, "init_db", AsyncMock())
+
+    fake_session = AsyncMock()
+    fake_session.run_sync = AsyncMock()
+
+    session_maker = MagicMock()
+    session_maker.return_value.__aenter__ = AsyncMock(return_value=fake_session)
+    session_maker.return_value.__aexit__ = AsyncMock(return_value=False)
+    monkeypatch.setattr(settings_router, "get_async_session_maker", lambda _login=None: session_maker)
+
+    fake_user_repo = MagicMock()
+    fake_user_repo.get_by_id = AsyncMock(return_value=None)
+    monkeypatch.setattr("app.repositories.user.UserRepository", lambda _session: fake_user_repo)
+
+    fake_settings_service = MagicMock()
+    fake_settings_service.set = AsyncMock()
+    monkeypatch.setattr(settings_router, "SettingsService", lambda *a, **k: fake_settings_service)
+
+    fake_channel_service = MagicMock()
+    fake_channel_service.create = AsyncMock(return_value=MagicMock(id=1))
+    fake_channel_service.restore_channels = AsyncMock()
+    monkeypatch.setattr(settings_router, "ChannelService", lambda *a, **k: fake_channel_service)
+    monkeypatch.setattr(settings_router, "PollService", lambda **k: MagicMock())
+
+    payload = settings_router.OnboardingComplete(
+        login="testuser",
+        email=settings_router.EmailConfig(
+            email="a@b.c",
+            password="supersecret",
+            imap_host="imap.example.com",
+            smtp_host="smtp.example.com",
+        ),
+    )
+
+    result = await settings_router.onboarding_complete(payload)
+
+    assert result["onboarded"] is True
+    config = fake_channel_service.create.await_args.kwargs["config"]
+    assert config["password"] != "supersecret"
+    assert decrypt(config["password"]) == "supersecret"

@@ -116,8 +116,8 @@ def _find_private_browser() -> tuple[str | None, list[str]]:
     import shutil
 
     candidates = [
-        ("msedge", ["--inprivate"]),
-        ("chrome", ["--incognito"]),
+        ("msedge", ["--inprivate", "--force-device-scale-factor=1"]),
+        ("chrome", ["--incognito", "--force-device-scale-factor=1"]),
         ("firefox", ["--private-window"]),
     ]
     for name, flags in candidates:
@@ -131,11 +131,11 @@ def _find_private_browser() -> tuple[str | None, list[str]]:
         for key, flags in [
             (
                 r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe",
-                ["--inprivate"],
+                ["--inprivate", "--force-device-scale-factor=1"],
             ),
             (
                 r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe",
-                ["--incognito"],
+                ["--incognito", "--force-device-scale-factor=1"],
             ),
         ]:
             try:
