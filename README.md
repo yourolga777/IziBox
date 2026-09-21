@@ -15,13 +15,21 @@
 - **Бэкап** — экспорт/импорт всех данных одним зашифрованным файлом.
 - **PWA** — работает офлайн, устанавливается на телефон.
 
+## Установка
+
+1. Скачайте `IziBox.exe` со [страницы релизов](https://github.com/yourolga777/IziBox/releases/latest).
+2. Поместите файл в любую папку (например, `D:\IziBox`) и запустите.
+3. Приложение запустится в фоне и откроет браузер; в системном трее появится иконка **IziBox** («Открыть IziBox» / «Выход»).
+
+Подробная инструкция — в [руководстве пользователя](docs/user-guide.md).
+
 ## Стек
 
 - **Backend:** Python 3.13, FastAPI, SQLAlchemy 2.0 (async), SQLite, Alembic
 - **Frontend:** React 19, TypeScript 5.6+, Vite 6, Tailwind CSS 4, PWA (vite-plugin-pwa)
 - **Проверки:** pytest, ruff, mypy, ESLint, Vitest
 
-## Быстрый старт
+## Запуск для разработки
 
 ```powershell
 # Backend (dev)
@@ -54,5 +62,6 @@ npm run build
 
 ## Документация
 
+- [Руководство пользователя](docs/user-guide.md)
 - [Архитектура](docs/architecture.md)
 - [Описание продукта](docs/product_description.md)

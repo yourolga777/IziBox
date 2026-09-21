@@ -1,8 +1,8 @@
-site_name: BiziBox
-site_description: Локальное PWA-приложение для управления коммуникациями малого бизнеса
-site_author: BiziBox Team
-repo_url: https://github.com/yourolga777/BiziBox
-site_url: https://yourolga777.github.io/BiziBox
+site_name: IziBox
+site_description: Личное PWA-приложение «сообщения и дела в одном окне»
+site_author: IziBox
+repo_url: https://github.com/yourolga777/IziBox
+site_url: https://yourolga777.github.io/IziBox
 
 theme:
   name: material
@@ -22,11 +22,12 @@ nav:
     - Установка: user-guide/installation.md
     - Быстрый старт: user-guide/quick-start.md
     - Подключение каналов: user-guide/channels.md
-    - Входящие сообщения: user-guide/inbox.md
+    - Входящие: user-guide/inbox.md
+    - Контакты: user-guide/contacts.md
     - Задачи: user-guide/tasks.md
+    - Календарь: user-guide/calendar.md
     - Дашборд: user-guide/dashboard.md
-    - AI-ассистент: user-guide/ai.md
-    - Часто задаваемые вопросы: user-guide/faq.md
+    - Частые вопросы: user-guide/faq.md
 
 markdown_extensions:
   - admonition
@@ -35,4 +36,4 @@ markdown_extensions:
   - attr_list
   - md_in_html
 
-copyright: Copyright &copy; 2026 BiziBox
+copyright: Copyright &copy; 2026 IziBox
